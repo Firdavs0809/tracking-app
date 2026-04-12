@@ -1,0 +1,72 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+
+# Local databases / temp
+*.sqlite3
+*.db
+
+# Alembic
+alembic/versions/__pycache__/
+
+# Docker
+docker-data/
+*.pid
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Type checker / tooling
+.pyre/
+.dmypy.json
+dmypy.json
+
+# Node if frontend appears later
+node_modules/
+
+# Mac/Linux temp
+.tmp/
+tmp/
