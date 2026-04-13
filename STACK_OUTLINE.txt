@@ -1,0 +1,57 @@
+================================================================================
+SHIPMENT-TRACKING — PRODUCTION STACK OUTLINE
+================================================================================
+
+1) SENTRY (errors + performance + request context)
+   - SDK: sentry-sdk[fastapi]
+   - Init in app startup: dsn from env, integrations FastAPI + Starlette, optional
+     traces_sample_rate / profiles_sample_rate for APM-style endpoint timing.
+   - Releases: set release + environment (staging/prod) from env for grouping in UI.
+   - Logs: enable LoggingIntegration or structlog handler if you want breadcrumbs;
+     otherwise Sentry captures unhandled exceptions and slow transactions automatically.
+   - PII: use before_send to scrub tokens if you log headers.
+
+2) PAGINATION (list endpoints)
+   - API: query params page (>=1), page_size (cap e.g. 100).
+   - DB: COUNT(*) with same WHERE as list query, then OFFSET/LIMIT or keyset (cursor)
+     for large tables later.
+   - Response envelope: { items, total, page, page_size } (or links: next/prev).
+
+3) REDIS (caching)
+   - Use redis.asyncio in FastAPI for hot reads (e.g. shipment by tracking_number,
+     rate-limit counters). TTL + explicit invalidation on PATCH/DELETE.
+   - Celery already uses Redis as broker; cache can be same instance different DB index
+     (e.g. /0 broker, /1 cache) to isolate keyspace.
+
+4) CELERY (background work)
+   - Broker + result backend: Redis (same as your sample compose).
+   - Worker: celery -A celery_app worker -l info -Q default,high,...
+   - Beat: periodic jobs (digests, SLA checks).
+   - Flower: monitor queues at :5555 (dev/staging; protect in prod).
+
+5) EMAIL — WHICH PROTOCOL?
+   - SMTP + TLS (STARTTLS on 587, or SMTPS on 465): universal, works with Gmail
+     (app passwords), SES SMTP, Mailgun SMTP, Postfix. Celery task uses sync smtplib
+     or aiosmtplib if you ever call from async.
+   - HTTPS APIs: SendGrid/Mailgun/SES API — often simpler retries/webhooks; not SMTP.
+   - Recommendation: production → provider API or SES SMTP; local dev → Mailpit/Mailhog
+     container (SMTP sink) in docker-compose.
+
+6) DOCKER LAYOUT (this repo = FastAPI root, not Django ./backend)
+   - Dockerfile: python:3.12-slim-bookworm, install deps, COPY app, CMD uvicorn.
+   - compose: backend, postgres, redis, celery-worker, celery-beat, flower; optional
+     mailpit for dev email.
+   - DATABASE_URL in compose: postgresql://...@postgres:5432/...
+   - Healthchecks on postgres + redis before workers start.
+
+7) IMPLEMENTATION ORDER (in this repo)
+   Done: Dockerfile, docker-compose.yml (3.8), .dockerignore
+   Done: STACK_OUTLINE.txt (this file), .env.example extended
+   Done: Sentry in main.py (SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_TRACES_SAMPLE_RATE)
+   Done: GET /tracking/shipments paginated -> ShipmentListPageSchema
+   Done: cache/redis_cache.py (get/set/delete + close on shutdown)
+   Done: celery_app.py, tasks/email_tasks.py (SMTP; Mailpit in compose)
+   You: cp .env.example .env then docker compose up --build
+   You: Set SENTRY_DSN in prod; use SMTP_USE_TLS=1 for real SMTP; wire cache_* on hot paths
+
+================================================================================
