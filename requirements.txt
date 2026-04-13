@@ -28,3 +28,4 @@ uvicorn==0.44.0
 python-multipart==0.0.26
 alembic==1.18.4
 psycopg2-binary==2.9.11
+psycopg==3.3.3
