@@ -2,8 +2,8 @@ import secrets
 import string
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -15,6 +15,7 @@ from models.users.models import User
 from models.users.choices import UserRole
 from schemas.tracking.schemas import (
     ShipmentCreateSchema,
+    ShipmentListPageSchema,
     ShipmentPatchSchema,
     ShipmentReadSchema,
     ShipmentStatusHistoryReadSchema,
@@ -74,8 +75,10 @@ async def tracking_root(user_id: str = Depends(get_current_user)):
     return {"message": "Tracking API — use /tracking/shipments"}
 
 
-@tracking_router.get("/shipments", response_model=list[ShipmentReadSchema])
+@tracking_router.get("/shipments", response_model=ShipmentListPageSchema)
 async def list_shipments(
+    page: int = Query(1, ge=1, description="1-based page index"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -85,15 +88,27 @@ async def list_shipments(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if _is_admin(me):
-        q = select(Shipment).order_by(Shipment.created_at.desc())
+        count_stmt = select(func.count()).select_from(Shipment)
+        list_stmt = select(Shipment).order_by(Shipment.created_at.desc())
     else:
-        q = (
-            select(Shipment)
-            .where(or_(Shipment.carrier_id == uid, Shipment.driver_id == uid))
-            .order_by(Shipment.created_at.desc())
+        cond = or_(Shipment.carrier_id == uid, Shipment.driver_id == uid)
+        count_stmt = select(func.count()).select_from(Shipment).where(cond)
+        list_stmt = (
+            select(Shipment).where(cond).order_by(Shipment.created_at.desc())
         )
-    r = await db.execute(q)
-    return list(r.scalars().all())
+
+    total = (await db.execute(count_stmt)).scalar_one()
+    offset = (page - 1) * page_size
+    list_stmt = list_stmt.offset(offset).limit(page_size)
+    r = await db.execute(list_stmt)
+    items = list(r.scalars().all())
+
+    return ShipmentListPageSchema(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @tracking_router.post(
@@ -155,6 +170,13 @@ async def create_shipment(
     )
     await db.commit()
     await db.refresh(shipment)
+    from tasks.email_tasks import send_email_smtp
+    send_email_smtp.delay(
+        subject="Registration",
+        from_address="jalolov.firdavs0809@gmail.com",
+        to_addresses=[me.email, shipment.driver.email],
+        body_plain="The shipment has been created for this product"
+    )
     return shipment
 
 

@@ -1,4 +1,9 @@
 asyncpg==0.30.0
+celery[redis]==5.4.0
+flower==2.0.1
+redis==5.2.1
+sentry-sdk[fastapi]==2.19.2
+python-jose[cryptography]==3.5.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
@@ -20,3 +25,4 @@ starlette==1.0.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.44.0
+python-multipart==0.0.26

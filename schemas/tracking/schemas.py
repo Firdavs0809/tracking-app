@@ -52,6 +52,13 @@ class ShipmentReadSchema(BaseModel):
     updated_at: datetime
 
 
+class ShipmentListPageSchema(BaseModel):
+    items: list[ShipmentReadSchema]
+    total: int
+    page: int
+    page_size: int
+
+
 class ShipmentStatusHistoryReadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
